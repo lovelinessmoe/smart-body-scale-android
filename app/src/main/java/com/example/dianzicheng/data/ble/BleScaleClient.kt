@@ -61,9 +61,13 @@ class BleScaleClient(private val context: Context) {
         }
     }
 
+    fun isBluetoothEnabled(): Boolean = bluetoothAdapter?.isEnabled == true
+
     fun startScan() {
-        val scanner = bluetoothAdapter?.bluetoothLeScanner ?: run {
-            Log.e("BleScaleClient", "Bluetooth scanner not available")
+        val scanner = bluetoothAdapter?.bluetoothLeScanner
+        if (scanner == null) {
+            val reason = if (bluetoothAdapter == null) "No BT Adapter" else if (!bluetoothAdapter.isEnabled) "BT Disabled" else "Scanner Null"
+            Log.e("BleScaleClient", "Bluetooth scanner not available: $reason")
             return
         }
         

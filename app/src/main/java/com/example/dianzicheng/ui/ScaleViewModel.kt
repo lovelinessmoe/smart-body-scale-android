@@ -83,6 +83,7 @@ class ScaleViewModel(
     }
 
     fun startScanning() {
+        android.util.Log.d("ScaleViewModel", "startScanning() called")
         bleClient.startScan()
     }
 }
