@@ -1,0 +1,122 @@
+package com.example.dianzicheng
+
+import android.Manifest
+import android.content.pm.PackageManager
+import android.os.Build
+import android.os.Bundle
+import androidx.activity.ComponentActivity
+import androidx.activity.compose.setContent
+import androidx.activity.enableEdgeToEdge
+import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.padding
+import androidx.compose.material3.Scaffold
+import androidx.compose.ui.Modifier
+import androidx.core.content.ContextCompat
+import androidx.lifecycle.ViewModel
+import androidx.lifecycle.ViewModelProvider
+import androidx.lifecycle.viewmodel.compose.viewModel
+import androidx.room.Room
+import com.example.dianzicheng.data.ble.BleScaleClient
+import androidx.compose.runtime.collectAsState
+import androidx.compose.runtime.getValue
+import androidx.lifecycle.lifecycleScope
+import kotlinx.coroutines.launch
+import com.example.dianzicheng.data.local.AppDatabase
+import com.example.dianzicheng.data.local.PreferenceManager
+import com.example.dianzicheng.data.repository.ProfileRepository
+import com.example.dianzicheng.data.repository.ScaleRepository
+import com.example.dianzicheng.ui.HistoryViewModel
+import com.example.dianzicheng.ui.MainScreen
+import com.example.dianzicheng.ui.ProfileViewModel
+import com.example.dianzicheng.ui.ScaleViewModel
+import com.example.dianzicheng.ui.theme.电子秤Theme
+
+class MainActivity : ComponentActivity() {
+    private lateinit var database: AppDatabase
+    private lateinit var bleClient: BleScaleClient
+    private lateinit var scaleRepository: ScaleRepository
+    private lateinit var profileRepository: ProfileRepository
+    private lateinit var preferenceManager: PreferenceManager
+
+    private val requestPermissionLauncher = registerForActivityResult(
+        ActivityResultContracts.RequestMultiplePermissions()
+    ) { permissions ->
+        // Handle permissions
+    }
+
+    override fun onCreate(savedInstanceState: Bundle?) {
+        super.onCreate(savedInstanceState)
+        
+        checkPermissions()
+        
+        database = Room.databaseBuilder(
+            applicationContext,
+            AppDatabase::class.java, "scale-db"
+        ).build()
+        
+        bleClient = BleScaleClient(applicationContext)
+        scaleRepository = ScaleRepository(database.scaleDao())
+        profileRepository = ProfileRepository(database.scaleDao())
+        preferenceManager = PreferenceManager(applicationContext)
+
+        enableEdgeToEdge()
+        setContent {
+            val isPairingComplete by preferenceManager.isPairingComplete.collectAsState(initial = false)
+            
+            电子秤Theme {
+                val scaleViewModel: ScaleViewModel = viewModel(
+                    factory = object : ViewModelProvider.Factory {
+                        override fun <T : ViewModel> create(modelClass: Class<T>): T {
+                            return ScaleViewModel(bleClient, scaleRepository) as T
+                        }
+                    }
+                )
+                val historyViewModel: HistoryViewModel = viewModel(
+                    factory = object : ViewModelProvider.Factory {
+                        override fun <T : ViewModel> create(modelClass: Class<T>): T {
+                            return HistoryViewModel(scaleRepository) as T
+                        }
+                    }
+                )
+                val profileViewModel: ProfileViewModel = viewModel(
+                    factory = object : ViewModelProvider.Factory {
+                        override fun <T : ViewModel> create(modelClass: Class<T>): T {
+                            return ProfileViewModel(profileRepository, preferenceManager) as T
+                        }
+                    }
+                )
+
+                MainScreen(
+                    scaleViewModel = scaleViewModel,
+                    historyViewModel = historyViewModel,
+                    profileViewModel = profileViewModel,
+                    isPairingComplete = isPairingComplete,
+                    onPairingComplete = {
+                        lifecycleScope.launch {
+                            preferenceManager.setPairingComplete(true)
+                        }
+                    }
+                )
+            }
+        }
+    }
+
+    private fun checkPermissions() {
+        val permissions = mutableListOf<String>()
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+            permissions.add(Manifest.permission.BLUETOOTH_SCAN)
+            permissions.add(Manifest.permission.BLUETOOTH_CONNECT)
+        } else {
+            permissions.add(Manifest.permission.ACCESS_FINE_LOCATION)
+        }
+        
+        val missing = permissions.filter {
+            ContextCompat.checkSelfPermission(this, it) != PackageManager.PERMISSION_GRANTED
+        }
+        
+        if (missing.isNotEmpty()) {
+            requestPermissionLauncher.launch(missing.toTypedArray())
+        }
+    }
+}
