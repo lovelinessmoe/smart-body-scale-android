@@ -40,8 +40,11 @@ class ScaleViewModel(
         }
         viewModelScope.launch {
             bleClient.isStable.collect { stable ->
-                _uiState.update { it.copy(isStable = stable, debugMessage = "isStable 收集到: $stable") }
-                if (stable) {
+                _uiState.update { it.copy(isStable = stable) }
+                if (!stable) {
+                    // Weight became unstable again — reset guard so next stable event saves correctly
+                    isMeasurementSaving = false
+                } else {
                     completeMeasurement()
                 }
             }
@@ -56,25 +59,13 @@ class ScaleViewModel(
     private fun completeMeasurement() {
         val weight = bleClient.weight.value
         val impedance = bleClient.impedance.value
-        
-        _uiState.update { it.copy(debugMessage = "进入 completeMeasurement: weight=$weight, imp=$impedance") }
-        
-        if (isMeasurementSaving) {
-            _uiState.update { it.copy(debugMessage = "保存标记为已保存，退出") }
-            return
-        }
-        if (weight <= 0.0) {
-            _uiState.update { it.copy(debugMessage = "体重小于等于0，退出") }
-            return
-        }
+
+        if (isMeasurementSaving || weight <= 0.0) return
         isMeasurementSaving = true
 
         viewModelScope.launch {
             try {
-                _uiState.update { it.copy(debugMessage = "正在匹配成员...") }
                 val matchedMember = repository.getBestMember(weight)
-                _uiState.update { it.copy(debugMessage = "匹配到成员: ${matchedMember?.name ?: "无"}") }
-                
                 val measurement = if (matchedMember != null) {
                     BodyAlgorithm.calculate(
                         weightKg = weight,
@@ -93,29 +84,22 @@ class ScaleViewModel(
                     )
                 }
 
-                _uiState.update { it.copy(debugMessage = "匹配并计算成功，准备写入数据库...") }
-
                 var finalMatchedMember: FamilyMember? = null
                 try {
                     finalMatchedMember = repository.saveMeasurement(measurement)
-                    _uiState.update { it.copy(debugMessage = "数据已成功写入数据库") }
                 } catch (e: Exception) {
                     android.util.Log.e("ScaleViewModel", "Database save failed", e)
-                    _uiState.update { it.copy(debugMessage = "数据库写入报错: ${e.message}") }
                 }
 
                 val diff = finalMatchedMember?.let { kotlin.math.abs(it.referenceWeightKg - measurement.weightKg) } ?: 100.0
-                
-                _uiState.update { 
+                _uiState.update {
                     it.copy(
                         currentMeasurement = measurement,
-                        showNewMemberAlert = diff > 7.0,
-                        debugMessage = "测量完成！体脂及其他参数已准备好"
-                    ) 
+                        showNewMemberAlert = diff > 7.0
+                    )
                 }
             } catch (e: Exception) {
                 android.util.Log.e("ScaleViewModel", "Error in completeMeasurement", e)
-                _uiState.update { it.copy(debugMessage = "计算过程报错: ${e.message}") }
             }
         }
     }

@@ -290,7 +290,7 @@ fun MeasurementDetailScreen(
             ) {
                 Column(modifier = Modifier.padding(20.dp)) {
                     Text(
-                        text = "身体数据 analysis",
+                        text = "身体数据分析",
                         style = MaterialTheme.typography.titleMedium,
                         fontWeight = FontWeight.Bold,
                         modifier = Modifier.padding(bottom = 16.dp)

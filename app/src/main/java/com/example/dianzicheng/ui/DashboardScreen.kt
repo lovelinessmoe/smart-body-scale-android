@@ -93,15 +93,6 @@ fun DashboardContent(
                 )
             }
 
-            uiState.debugMessage?.let {
-                Spacer(modifier = Modifier.height(16.dp))
-                Text(
-                    text = "调试: $it",
-                    color = MaterialTheme.colorScheme.error,
-                    style = MaterialTheme.typography.bodySmall
-                )
-            }
-            
             Spacer(modifier = Modifier.height(48.dp))
         }
     }

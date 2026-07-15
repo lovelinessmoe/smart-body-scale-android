@@ -35,6 +35,9 @@ class BleScaleClient(private val context: Context) {
 
     enum class ConnectionState { IDLE, SCANNING, CONNECTING, CONNECTED, MEASURING }
 
+    var lastPairedMac: String? = null
+    var onMacDiscovered: ((String) -> Unit)? = null
+
     private val scanCallback = object : ScanCallback() {
         override fun onScanResult(callbackType: Int, result: ScanResult) {
             val device = result.device
@@ -44,13 +47,14 @@ class BleScaleClient(private val context: Context) {
             
             Log.d("BleScaleClient", "Scanning... Found: $deviceName [${device.address}] UUIDs: $serviceUuids")
 
-            // Broaden search: Any device with our service UUID or AFU-WL name
             val isAfuName = deviceName?.startsWith("AFU-WL", ignoreCase = true) == true
             val hasService = serviceUuids?.any { it.uuid == SERVICE_UUID } == true
+            val isMatchedMac = !lastPairedMac.isNullOrEmpty() && device.address.equals(lastPairedMac, ignoreCase = true)
 
-            if (isAfuName || hasService) {
-                Log.d("BleScaleClient", "MATCH FOUND! Connecting to: $deviceName")
+            if (isAfuName || hasService || isMatchedMac) {
+                Log.d("BleScaleClient", "MATCH FOUND! Connecting to: $deviceName [${device.address}]")
                 stopScan()
+                onMacDiscovered?.invoke(device.address)
                 connect(device)
             }
         }
@@ -75,14 +79,35 @@ class BleScaleClient(private val context: Context) {
             return
         }
         
-        Log.d("BleScaleClient", "Starting scan for service: $SERVICE_UUID")
+        Log.d("BleScaleClient", "Starting scan for service: $SERVICE_UUID, pairedMac: $lastPairedMac")
         _connectionState.value = ConnectionState.SCANNING
+
+        // If paired MAC is known and valid, attempt direct GATT connect simultaneously
+        if (!lastPairedMac.isNullOrEmpty() && BluetoothAdapter.checkBluetoothAddress(lastPairedMac)) {
+            try {
+                val pairedDevice = bluetoothAdapter.getRemoteDevice(lastPairedMac)
+                if (pairedDevice != null) {
+                    Log.d("BleScaleClient", "Attempting direct GATT connect to paired MAC: $lastPairedMac")
+                    connect(pairedDevice)
+                }
+            } catch (e: Exception) {
+                Log.w("BleScaleClient", "Direct connect failed, falling back to scan", e)
+            }
+        }
         
-        // Remove filters temporarily to see all devices in logs if connection fails
+        // Build hardware-accelerated scan filters for instant controller-level matching
+        val filters = mutableListOf<ScanFilter>()
+        if (!lastPairedMac.isNullOrEmpty() && BluetoothAdapter.checkBluetoothAddress(lastPairedMac)) {
+            filters.add(ScanFilter.Builder().setDeviceAddress(lastPairedMac).build())
+        }
+        filters.add(ScanFilter.Builder().setServiceUuid(ParcelUuid(SERVICE_UUID)).build())
+
         val settings = ScanSettings.Builder()
             .setScanMode(ScanSettings.SCAN_MODE_LOW_LATENCY)
+            .setReportDelay(0)
             .build()
-        scanner.startScan(null, settings, scanCallback)
+
+        scanner.startScan(filters, settings, scanCallback)
     }
 
     fun stopScan() {

@@ -6,7 +6,6 @@ import com.example.dianzicheng.data.local.toEntity
 import com.example.dianzicheng.domain.BodyMeasurement
 import com.example.dianzicheng.domain.FamilyMember
 import kotlinx.coroutines.flow.Flow
-import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.map
 import java.util.*
 import kotlin.math.abs

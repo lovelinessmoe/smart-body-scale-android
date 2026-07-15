@@ -60,6 +60,18 @@ class MainActivity : ComponentActivity() {
         profileRepository = ProfileRepository(database.scaleDao())
         preferenceManager = PreferenceManager(applicationContext)
 
+        bleClient.onMacDiscovered = { mac ->
+            lifecycleScope.launch {
+                preferenceManager.savePairedMac(mac)
+            }
+        }
+
+        lifecycleScope.launch {
+            preferenceManager.pairedMac.collect { mac ->
+                bleClient.lastPairedMac = mac
+            }
+        }
+
         enableEdgeToEdge()
         setContent {
             val isPairingComplete by preferenceManager.isPairingComplete.collectAsState(initial = false)
