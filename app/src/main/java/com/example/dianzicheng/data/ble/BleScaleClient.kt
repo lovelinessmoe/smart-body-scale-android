@@ -64,6 +64,10 @@ class BleScaleClient(private val context: Context) {
     fun isBluetoothEnabled(): Boolean = bluetoothAdapter?.isEnabled == true
 
     fun startScan() {
+        _weight.value = 0.0
+        _isStable.value = false
+        _impedance.value = 0.0
+
         val scanner = bluetoothAdapter?.bluetoothLeScanner
         if (scanner == null) {
             val reason = if (bluetoothAdapter == null) "No BT Adapter" else if (!bluetoothAdapter.isEnabled) "BT Disabled" else "Scanner Null"
@@ -103,6 +107,8 @@ class BleScaleClient(private val context: Context) {
         override fun onConnectionStateChange(gatt: BluetoothGatt, status: Int, newState: Int) {
             if (newState == BluetoothProfile.STATE_CONNECTED) {
                 _connectionState.value = ConnectionState.CONNECTED
+                // Request high priority connection parameters to speed up service discovery and subscriptions
+                gatt.requestConnectionPriority(BluetoothGatt.CONNECTION_PRIORITY_HIGH)
                 gatt.discoverServices()
             } else if (newState == BluetoothProfile.STATE_DISCONNECTED) {
                 _connectionState.value = ConnectionState.IDLE
@@ -154,9 +160,13 @@ class BleScaleClient(private val context: Context) {
             Log.d("BleScaleClient", "Data received from ${characteristic.uuid}: ${data.joinToString(",") { "%02X".format(it) }}")
             AFUPacketParser.parseWeight(data)?.let {
                 _weight.value = it.weightKg
-                _isStable.value = it.isStable
-                if (it.isStable) {
-                   _connectionState.value = ConnectionState.MEASURING
+                if (it.weightKg > 0.0) {
+                    _isStable.value = it.isStable
+                    if (it.isStable) {
+                       _connectionState.value = ConnectionState.MEASURING
+                    }
+                } else {
+                    _isStable.value = false
                 }
             }
             AFUPacketParser.parseImpedance(data)?.let {

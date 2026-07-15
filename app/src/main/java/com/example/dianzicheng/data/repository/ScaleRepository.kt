@@ -16,7 +16,7 @@ class ScaleRepository(private val dao: ScaleDao) {
         dao.getAllMeasurements().map { entities -> entities.map { it.toDomain() } }
 
     suspend fun saveMeasurement(measurement: BodyMeasurement): FamilyMember? {
-        val members = dao.getAllMembers().first().map { it.toDomain() }
+        val members = dao.getMembersList().map { it.toDomain() }
         val matchedMember = findBestMember(measurement.weightKg, members)
         
         val finalMeasurement = measurement.copy(
@@ -34,9 +34,28 @@ class ScaleRepository(private val dao: ScaleDao) {
         return matchedMember
     }
 
+    suspend fun getBestMember(weightKg: Double): FamilyMember? {
+        val members = dao.getMembersList().map { it.toDomain() }
+        return findBestMember(weightKg, members)
+    }
+
     private fun findBestMember(weightKg: Double, members: List<FamilyMember>): FamilyMember? {
         if (members.isEmpty()) return null
-        return members.minByOrNull { abs(it.referenceWeightKg - weightKg) }
+        
+        // 1. Check if there are any members who have never measured (referenceWeightKg <= 0.0)
+        // If so, match the first measurement to them!
+        val neverMeasured = members.firstOrNull { it.referenceWeightKg <= 0.0 }
+        if (neverMeasured != null) {
+            return neverMeasured
+        }
+
+        // 2. Otherwise, find the closest member within 7.0 kg range
+        val best = members.minByOrNull { abs(it.referenceWeightKg - weightKg) }
+        return if (best != null && abs(best.referenceWeightKg - weightKg) <= 7.0) {
+            best
+        } else {
+            null
+        }
     }
 
     suspend fun deleteMeasurement(measurement: BodyMeasurement) {

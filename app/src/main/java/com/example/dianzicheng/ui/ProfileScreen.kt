@@ -5,6 +5,7 @@ import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
@@ -102,7 +103,7 @@ fun ProfileContent(
                 Column(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .clip(MaterialTheme.shapes.extraLarge)
+                        .clip(RoundedCornerShape(8.dp))
                         .background(MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.3f))
                 ) {
                     SettingsItem(
@@ -181,7 +182,7 @@ fun SettingsItem(title: String, icon: ImageVector, onClick: () -> Unit) {
 fun MemberCard(member: FamilyMember, onDelete: () -> Unit) {
     Card(
         modifier = Modifier.fillMaxWidth(),
-        shape = MaterialTheme.shapes.extraLarge,
+        shape = RoundedCornerShape(8.dp),
         colors = CardDefaults.cardColors(
             containerColor = MaterialTheme.colorScheme.secondaryContainer.copy(alpha = 0.3f)
         )
@@ -284,7 +285,7 @@ fun AddMemberDialog(
                         sex,
                         height.toDoubleOrNull() ?: 170.0,
                         System.currentTimeMillis() - (1000L * 60 * 60 * 24 * 365 * 25),
-                        0.0 // Default reference weight
+                        0.0
                     )
                 },
                 shape = MaterialTheme.shapes.medium

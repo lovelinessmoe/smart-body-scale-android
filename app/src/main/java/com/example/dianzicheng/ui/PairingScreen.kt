@@ -41,7 +41,7 @@ fun PairingScreen(
                 onClick = { viewModel.startScanning() },
                 modifier = Modifier.fillMaxWidth()
             ) {
-                Text("开始配To")
+                Text("开始配对")
             }
         }
         

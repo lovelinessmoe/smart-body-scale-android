@@ -12,6 +12,9 @@ interface ScaleDao {
     @Query("SELECT * FROM members")
     fun getAllMembers(): Flow<List<MemberEntity>>
 
+    @Query("SELECT * FROM members")
+    suspend fun getMembersList(): List<MemberEntity>
+
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun insertMember(member: MemberEntity)
 

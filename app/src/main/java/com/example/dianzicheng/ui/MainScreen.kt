@@ -11,6 +11,8 @@ import androidx.compose.ui.Modifier
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.rememberNavController
+import androidx.navigation.NavType
+import androidx.navigation.navArgument
 
 @Composable
 fun MainScreen(
@@ -64,8 +66,28 @@ fun MainScreen(
             modifier = Modifier.padding(innerPadding)
         ) {
             composable("dashboard") { DashboardScreen(scaleViewModel) }
-            composable("history") { HistoryScreen(historyViewModel) }
+            composable("history") { 
+                HistoryScreen(
+                    viewModel = historyViewModel,
+                    onNavigateToDetail = { id ->
+                        navController.navigate("detail/$id")
+                    }
+                )
+            }
             composable("profile") { ProfileScreen(profileViewModel) }
+            composable(
+                route = "detail/{id}",
+                arguments = listOf(navArgument("id") { type = NavType.StringType })
+            ) { backStackEntry ->
+                val id = backStackEntry.arguments?.getString("id")
+                val measurement = historyViewModel.history.collectAsState().value.find { it.id == id }
+                if (measurement != null) {
+                    MeasurementDetailScreen(
+                        measurement = measurement,
+                        onBack = { navController.popBackStack() }
+                    )
+                }
+            }
         }
     }
 }

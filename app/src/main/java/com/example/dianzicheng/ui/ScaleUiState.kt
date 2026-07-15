@@ -10,5 +10,6 @@ data class ScaleUiState(
     val isStable: Boolean = false,
     val currentMeasurement: BodyMeasurement? = null,
     val showNewMemberAlert: Boolean = false,
-    val error: String? = null
+    val error: String? = null,
+    val debugMessage: String? = null
 )

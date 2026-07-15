@@ -5,6 +5,7 @@ import androidx.compose.animation.core.*
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -92,6 +93,15 @@ fun DashboardContent(
                 )
             }
 
+            uiState.debugMessage?.let {
+                Spacer(modifier = Modifier.height(16.dp))
+                Text(
+                    text = "调试: $it",
+                    color = MaterialTheme.colorScheme.error,
+                    style = MaterialTheme.typography.bodySmall
+                )
+            }
+            
             Spacer(modifier = Modifier.height(48.dp))
         }
     }
@@ -195,7 +205,7 @@ fun WeightDisplay(weight: Double, isStable: Boolean) {
 fun MeasurementResultCard(it: com.example.dianzicheng.domain.BodyMeasurement) {
     Card(
         modifier = Modifier.fillMaxWidth(),
-        shape = MaterialTheme.shapes.extraLarge,
+        shape = RoundedCornerShape(8.dp),
         colors = CardDefaults.cardColors(
             containerColor = MaterialTheme.colorScheme.secondaryContainer.copy(alpha = 0.3f)
         )
@@ -291,6 +301,13 @@ fun DashboardScreen(
     modifier: Modifier = Modifier
 ) {
     val uiState by viewModel.uiState.collectAsState()
+
+    LaunchedEffect(Unit) {
+        if (uiState.connection == BleScaleClient.ConnectionState.IDLE) {
+            viewModel.startScanning()
+        }
+    }
+
     DashboardContent(
         uiState = uiState,
         onStartScan = { viewModel.startScanning() },
