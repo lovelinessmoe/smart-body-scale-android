@@ -7,7 +7,6 @@ import android.bluetooth.le.ScanFilter
 import android.bluetooth.le.ScanResult
 import android.bluetooth.le.ScanSettings
 import android.content.Context
-import android.os.ParcelUuid
 import android.util.Log
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -95,12 +94,18 @@ class BleScaleClient(private val context: Context) {
             }
         }
         
-        // Build hardware-accelerated scan filters for instant controller-level matching
-        val filters = mutableListOf<ScanFilter>()
-        if (!lastPairedMac.isNullOrEmpty() && BluetoothAdapter.checkBluetoothAddress(lastPairedMac)) {
-            filters.add(ScanFilter.Builder().setDeviceAddress(lastPairedMac).build())
+        // Build hardware-accelerated scan filters for instant controller-level matching.
+        // NOTE: We do NOT add a service UUID filter here, because many BLE scales (including
+        // AFU-WL series) do NOT advertise their service UUID in the advertisement packet.
+        // Adding a service UUID filter would silently block those devices at the hardware level.
+        // Instead, we rely on name-prefix matching in the scanCallback.
+        val filters: List<ScanFilter>? = if (!lastPairedMac.isNullOrEmpty() && BluetoothAdapter.checkBluetoothAddress(lastPairedMac)) {
+            // When we already know the device's MAC, use it for fast hardware-level matching.
+            listOf(ScanFilter.Builder().setDeviceAddress(lastPairedMac).build())
+        } else {
+            // First time: scan all devices and let the callback filter by name.
+            null
         }
-        filters.add(ScanFilter.Builder().setServiceUuid(ParcelUuid(SERVICE_UUID)).build())
 
         val settings = ScanSettings.Builder()
             .setScanMode(ScanSettings.SCAN_MODE_LOW_LATENCY)
