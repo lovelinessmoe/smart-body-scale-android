@@ -68,7 +68,7 @@ class MainActivity : ComponentActivity() {
 
         lifecycleScope.launch {
             preferenceManager.pairedMac.collect { mac ->
-                bleClient.lastPairedMac = mac
+                bleClient.lastPairedMac = mac  // null clears memory, preventing stale reconnect
             }
         }
 
@@ -119,8 +119,10 @@ class MainActivity : ComponentActivity() {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
             permissions.add(Manifest.permission.BLUETOOTH_SCAN)
             permissions.add(Manifest.permission.BLUETOOTH_CONNECT)
+            permissions.add(Manifest.permission.ACCESS_FINE_LOCATION)
         } else {
             permissions.add(Manifest.permission.ACCESS_FINE_LOCATION)
+            permissions.add(Manifest.permission.ACCESS_COARSE_LOCATION)
         }
         
         val missing = permissions.filter {

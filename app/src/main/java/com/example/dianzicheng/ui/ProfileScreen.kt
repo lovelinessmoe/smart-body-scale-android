@@ -280,13 +280,15 @@ fun AddMemberDialog(
         confirmButton = {
             Button(
                 onClick = {
+                    val finalName = if (name.isBlank()) "新成员" else name.trim()
                     onConfirm(
-                        name,
+                        finalName,
                         sex,
                         height.toDoubleOrNull() ?: 170.0,
                         System.currentTimeMillis() - (1000L * 60 * 60 * 24 * 365 * 25),
                         0.0
                     )
+                    onDismiss()
                 },
                 shape = MaterialTheme.shapes.medium
             ) {

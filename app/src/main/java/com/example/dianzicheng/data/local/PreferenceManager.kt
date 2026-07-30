@@ -36,4 +36,11 @@ class PreferenceManager(private val context: Context) {
             preferences[PAIRED_MAC] = mac
         }
     }
+
+    suspend fun clearPairedMac() {
+        context.dataStore.edit { preferences ->
+            preferences.remove(PAIRED_MAC)
+            preferences[PAIRING_COMPLETE] = false
+        }
+    }
 }

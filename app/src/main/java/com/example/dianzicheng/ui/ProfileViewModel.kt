@@ -42,7 +42,7 @@ class ProfileViewModel(
 
     fun resetPairing() {
         viewModelScope.launch {
-            preferenceManager.setPairingComplete(false)
+            preferenceManager.clearPairedMac()
         }
     }
 }

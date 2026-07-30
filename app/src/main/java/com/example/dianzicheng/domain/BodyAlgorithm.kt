@@ -56,6 +56,6 @@ object BodyAlgorithm {
         if (today.get(Calendar.DAY_OF_YEAR) < birthDate.get(Calendar.DAY_OF_YEAR)) {
             age--
         }
-        return age
+        return age.coerceIn(1, 120)
     }
 }

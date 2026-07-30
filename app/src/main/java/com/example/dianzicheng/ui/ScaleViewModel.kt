@@ -21,7 +21,8 @@ class ScaleViewModel(
     private val _uiState = MutableStateFlow(ScaleUiState())
     val uiState: StateFlow<ScaleUiState> = _uiState.asStateFlow()
 
-    private var isMeasurementSaving = false
+    private var activeSessionId: String? = null
+    private var hasAlertedForCurrentSession = false
 
     init {
         observeBle()
@@ -36,32 +37,55 @@ class ScaleViewModel(
         viewModelScope.launch {
             bleClient.weight.collect { weight ->
                 _uiState.update { it.copy(liveWeightKg = weight) }
+                if (_uiState.value.isStable && weight > 0.0) {
+                    saveOrUpdateMeasurement(isFinalLocked = false)
+                }
             }
         }
         viewModelScope.launch {
             bleClient.isStable.collect { stable ->
                 _uiState.update { it.copy(isStable = stable) }
                 if (!stable) {
-                    // Weight became unstable again — reset guard so next stable event saves correctly
-                    isMeasurementSaving = false
+                    activeSessionId = null
+                    hasAlertedForCurrentSession = false
                 } else {
-                    completeMeasurement()
+                    if (activeSessionId == null) {
+                        activeSessionId = java.util.UUID.randomUUID().toString()
+                    }
+                    saveOrUpdateMeasurement(isFinalLocked = true)
                 }
             }
         }
         viewModelScope.launch {
             bleClient.impedance.collect { imp ->
                 _uiState.update { it.copy(impedanceOhm = imp) }
+                if (_uiState.value.isStable && bleClient.weight.value > 0.0) {
+                    saveOrUpdateMeasurement(isFinalLocked = false)
+                }
+            }
+        }
+        viewModelScope.launch {
+            bleClient.discoveredDevice.collect { pair ->
+                _uiState.update { 
+                    it.copy(
+                        discoveredDeviceName = pair?.first,
+                        discoveredDeviceMac = pair?.second
+                    )
+                }
             }
         }
     }
 
-    private fun completeMeasurement() {
+    fun connectToMac(mac: String) {
+        bleClient.connectMac(mac)
+    }
+
+    private fun saveOrUpdateMeasurement(isFinalLocked: Boolean = false) {
         val weight = bleClient.weight.value
         val impedance = bleClient.impedance.value
 
-        if (isMeasurementSaving || weight <= 0.0) return
-        isMeasurementSaving = true
+        if (weight <= 0.0) return
+        val currentSessionId = activeSessionId ?: java.util.UUID.randomUUID().toString().also { activeSessionId = it }
 
         viewModelScope.launch {
             try {
@@ -84,22 +108,29 @@ class ScaleViewModel(
                     )
                 }
 
+                val finalMeasurementWithId = measurement.copy(id = currentSessionId)
+
                 var finalMatchedMember: FamilyMember? = null
                 try {
-                    finalMatchedMember = repository.saveMeasurement(measurement)
+                    finalMatchedMember = repository.saveMeasurement(finalMeasurementWithId, existingId = currentSessionId)
                 } catch (e: Exception) {
                     android.util.Log.e("ScaleViewModel", "Database save failed", e)
                 }
 
-                val diff = finalMatchedMember?.let { kotlin.math.abs(it.referenceWeightKg - measurement.weightKg) } ?: 100.0
+                val diff = finalMatchedMember?.let { kotlin.math.abs(it.referenceWeightKg - weight) } ?: 100.0
+                val shouldShowAlert = isFinalLocked && !hasAlertedForCurrentSession && (diff > 7.0)
+                if (shouldShowAlert) {
+                    hasAlertedForCurrentSession = true
+                }
+
                 _uiState.update {
                     it.copy(
-                        currentMeasurement = measurement,
-                        showNewMemberAlert = diff > 7.0
+                        currentMeasurement = finalMeasurementWithId,
+                        showNewMemberAlert = if (shouldShowAlert) true else it.showNewMemberAlert
                     )
                 }
             } catch (e: Exception) {
-                android.util.Log.e("ScaleViewModel", "Error in completeMeasurement", e)
+                android.util.Log.e("ScaleViewModel", "Error in saveOrUpdateMeasurement", e)
             }
         }
     }
@@ -110,7 +141,7 @@ class ScaleViewModel(
 
     fun startScanning() {
         android.util.Log.d("ScaleViewModel", "startScanning() called")
-        isMeasurementSaving = false
+        activeSessionId = null
         _uiState.update {
             it.copy(
                 currentMeasurement = null,

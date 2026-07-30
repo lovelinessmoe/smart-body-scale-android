@@ -11,5 +11,7 @@ data class ScaleUiState(
     val currentMeasurement: BodyMeasurement? = null,
     val showNewMemberAlert: Boolean = false,
     val error: String? = null,
-    val debugMessage: String? = null
+    val debugMessage: String? = null,
+    val discoveredDeviceName: String? = null,
+    val discoveredDeviceMac: String? = null
 )

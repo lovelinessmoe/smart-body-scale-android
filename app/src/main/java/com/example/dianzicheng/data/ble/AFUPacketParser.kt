@@ -23,4 +23,3 @@ object AFUPacketParser {
 
     data class WeightData(val weightKg: Double, val isStable: Boolean)
 }
-

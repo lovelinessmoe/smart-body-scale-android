@@ -14,12 +14,12 @@ class ScaleRepository(private val dao: ScaleDao) {
     fun getHistory(): Flow<List<BodyMeasurement>> =
         dao.getAllMeasurements().map { entities -> entities.map { it.toDomain() } }
 
-    suspend fun saveMeasurement(measurement: BodyMeasurement): FamilyMember? {
+    suspend fun saveMeasurement(measurement: BodyMeasurement, existingId: String? = null): FamilyMember? {
         val members = dao.getMembersList().map { it.toDomain() }
         val matchedMember = findBestMember(measurement.weightKg, members)
         
         val finalMeasurement = measurement.copy(
-            id = UUID.randomUUID().toString(),
+            id = existingId ?: measurement.id.ifEmpty { UUID.randomUUID().toString() },
             memberId = matchedMember?.id,
             memberNameSnapshot = matchedMember?.name
         )
