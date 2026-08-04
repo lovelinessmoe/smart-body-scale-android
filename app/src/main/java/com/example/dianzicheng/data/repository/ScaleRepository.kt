@@ -14,23 +14,42 @@ class ScaleRepository(private val dao: ScaleDao) {
     fun getHistory(): Flow<List<BodyMeasurement>> =
         dao.getAllMeasurements().map { entities -> entities.map { it.toDomain() } }
 
-    suspend fun saveMeasurement(measurement: BodyMeasurement, existingId: String? = null): FamilyMember? {
+    fun getMembers(): Flow<List<FamilyMember>> =
+        dao.getAllMembers().map { entities -> entities.map { it.toDomain() } }
+
+    suspend fun saveMeasurement(
+        measurement: BodyMeasurement,
+        targetMember: FamilyMember? = null,
+        existingId: String? = null
+    ): FamilyMember? {
         val members = dao.getMembersList().map { it.toDomain() }
-        val matchedMember = findBestMember(measurement.weightKg, members)
+        val memberToBind = targetMember
+            ?: members.firstOrNull { it.id == measurement.memberId }
+            ?: findBestMember(measurement.weightKg, members)
         
         val finalMeasurement = measurement.copy(
             id = existingId ?: measurement.id.ifEmpty { UUID.randomUUID().toString() },
-            memberId = matchedMember?.id,
-            memberNameSnapshot = matchedMember?.name
+            memberId = memberToBind?.id,
+            memberNameSnapshot = memberToBind?.name
         )
         dao.insertMeasurement(finalMeasurement.toEntity())
         
-        // Update matched member's reference weight to keep matching accurate for next time
-        matchedMember?.let { member ->
+        // Update member's reference weight to keep matching accurate for next time
+        memberToBind?.let { member ->
             dao.insertMember(member.copy(referenceWeightKg = measurement.weightKg).toEntity())
         }
 
-        return matchedMember
+        return memberToBind
+    }
+
+    suspend fun bindMeasurementToMember(measurement: BodyMeasurement, member: FamilyMember): BodyMeasurement {
+        val updated = measurement.copy(
+            memberId = member.id,
+            memberNameSnapshot = member.name
+        )
+        dao.insertMeasurement(updated.toEntity())
+        dao.insertMember(member.copy(referenceWeightKg = measurement.weightKg).toEntity())
+        return updated
     }
 
     suspend fun getBestMember(weightKg: Double): FamilyMember? {

@@ -32,6 +32,58 @@ class ScaleViewModel(
 
     init {
         observeBle()
+        observeMembers()
+    }
+
+    private fun observeMembers() {
+        viewModelScope.launch {
+            repository.getMembers().collect { members ->
+                _uiState.update { state ->
+                    val currentSelected = state.selectedMember
+                    val updatedSelected = if (currentSelected != null) {
+                        members.firstOrNull { it.id == currentSelected.id } ?: currentSelected
+                    } else null
+                    state.copy(
+                        availableMembers = members,
+                        selectedMember = updatedSelected
+                    )
+                }
+            }
+        }
+    }
+
+    fun selectMember(member: FamilyMember?) {
+        _uiState.update { it.copy(selectedMember = member) }
+        // If there's an active measurement, re-calculate and re-bind to selected member
+        val currentMeas = _uiState.value.currentMeasurement
+        if (currentMeas != null && member != null) {
+            bindCurrentMeasurementToMember(member)
+        }
+    }
+
+    fun bindCurrentMeasurementToMember(member: FamilyMember) {
+        val currentMeas = _uiState.value.currentMeasurement ?: return
+        viewModelScope.launch {
+            try {
+                val recalculated = BodyAlgorithm.calculate(
+                    weightKg = currentMeas.weightKg,
+                    impedanceOhm = currentMeas.impedanceOhm,
+                    sex = member.sex,
+                    heightCm = member.heightCm,
+                    birthDateEpochMs = member.birthDateEpochMs
+                ).copy(id = currentMeas.id)
+
+                repository.saveMeasurement(recalculated, targetMember = member, existingId = currentMeas.id)
+                _uiState.update {
+                    it.copy(
+                        currentMeasurement = recalculated,
+                        selectedMember = member
+                    )
+                }
+            } catch (e: Exception) {
+                android.util.Log.e("ScaleViewModel", "Error binding measurement to member", e)
+            }
+        }
     }
 
     private fun observeBle() {
@@ -95,14 +147,14 @@ class ScaleViewModel(
 
         viewModelScope.launch {
             try {
-                val matchedMember = repository.getBestMember(weight)
-                val measurement = if (matchedMember != null) {
+                val targetMember = _uiState.value.selectedMember ?: repository.getBestMember(weight)
+                val measurement = if (targetMember != null) {
                     BodyAlgorithm.calculate(
                         weightKg = weight,
                         impedanceOhm = impedance,
-                        sex = matchedMember.sex,
-                        heightCm = matchedMember.heightCm,
-                        birthDateEpochMs = matchedMember.birthDateEpochMs
+                        sex = targetMember.sex,
+                        heightCm = targetMember.heightCm,
+                        birthDateEpochMs = targetMember.birthDateEpochMs
                     )
                 } else {
                     BodyAlgorithm.calculate(
@@ -118,7 +170,11 @@ class ScaleViewModel(
 
                 var finalMatchedMember: FamilyMember? = null
                 try {
-                    finalMatchedMember = repository.saveMeasurement(finalMeasurementWithId, existingId = currentSessionId)
+                    finalMatchedMember = repository.saveMeasurement(
+                        finalMeasurementWithId,
+                        targetMember = targetMember,
+                        existingId = currentSessionId
+                    )
                 } catch (e: Exception) {
                     android.util.Log.e("ScaleViewModel", "Database save failed", e)
                 }

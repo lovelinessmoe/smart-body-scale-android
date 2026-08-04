@@ -3,9 +3,14 @@ package com.example.dianzicheng.ui
 import androidx.compose.animation.*
 import androidx.compose.animation.core.*
 import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -18,6 +23,9 @@ import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.example.dianzicheng.data.ble.BleScaleClient
+import com.example.dianzicheng.domain.BodyMeasurement
+import com.example.dianzicheng.domain.FamilyMember
+import com.example.dianzicheng.domain.Sex
 import com.example.dianzicheng.ui.theme.电子秤Theme
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -26,8 +34,12 @@ fun DashboardContent(
     uiState: ScaleUiState,
     onStartScan: () -> Unit,
     onDismissAlert: () -> Unit,
+    onSelectMember: (FamilyMember?) -> Unit,
+    onBindMember: (FamilyMember) -> Unit,
     modifier: Modifier = Modifier
 ) {
+    var showMemberSelectDialog by remember { mutableStateOf(false) }
+
     Scaffold(
         topBar = {
             CenterAlignedTopAppBar(
@@ -46,7 +58,48 @@ fun DashboardContent(
                 .padding(horizontal = 24.dp),
             horizontalAlignment = Alignment.CenterHorizontally
         ) {
-            Spacer(modifier = Modifier.height(40.dp))
+            Spacer(modifier = Modifier.height(16.dp))
+
+            // Member Selector Chip
+            Surface(
+                onClick = { showMemberSelectDialog = true },
+                shape = CircleShape,
+                color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f),
+                border = androidx.compose.foundation.BorderStroke(
+                    1.dp,
+                    MaterialTheme.colorScheme.primary.copy(alpha = 0.3f)
+                )
+            ) {
+                Row(
+                    modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Icon(
+                        Icons.Default.Person,
+                        contentDescription = null,
+                        modifier = Modifier.size(18.dp),
+                        tint = MaterialTheme.colorScheme.primary
+                    )
+                    Spacer(modifier = Modifier.width(6.dp))
+                    Text(
+                        text = uiState.selectedMember?.let {
+                            "绑定成员: ${it.name} (${if (it.sex == Sex.MALE) "男" else "女"} ${it.heightCm.toInt()}cm)"
+                        } ?: "全员智能自动匹配",
+                        style = MaterialTheme.typography.labelLarge,
+                        fontWeight = FontWeight.SemiBold,
+                        color = MaterialTheme.colorScheme.onSurface
+                    )
+                    Spacer(modifier = Modifier.width(4.dp))
+                    Icon(
+                        Icons.Default.ArrowDropDown,
+                        contentDescription = null,
+                        modifier = Modifier.size(20.dp),
+                        tint = MaterialTheme.colorScheme.primary
+                    )
+                }
+            }
+
+            Spacer(modifier = Modifier.height(16.dp))
 
             // Connection Status Chip
             ConnectionStatusChip(uiState.connection)
@@ -65,11 +118,15 @@ fun DashboardContent(
                 exit = fadeOut() + shrinkVertically()
             ) {
                 uiState.currentMeasurement?.let {
-                    MeasurementResultCard(it)
+                    MeasurementResultCard(
+                        measurement = it,
+                        availableMembers = uiState.availableMembers,
+                        onBindMember = onBindMember
+                    )
                 }
             }
 
-            Spacer(modifier = Modifier.height(32.dp))
+            Spacer(modifier = Modifier.height(24.dp))
 
             // Action Button
             if (uiState.connection == BleScaleClient.ConnectionState.IDLE) {
@@ -84,7 +141,9 @@ fun DashboardContent(
                 }
             } else if (uiState.connection == BleScaleClient.ConnectionState.SCANNING) {
                 LinearProgressIndicator(
-                    modifier = Modifier.fillMaxWidth().clip(CircleShape)
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .clip(CircleShape)
                 )
                 Text(
                     "正在寻找设备...",
@@ -93,7 +152,7 @@ fun DashboardContent(
                 )
             }
 
-            Spacer(modifier = Modifier.height(48.dp))
+            Spacer(modifier = Modifier.height(32.dp))
         }
     }
 
@@ -106,6 +165,18 @@ fun DashboardContent(
                 TextButton(onClick = onDismissAlert) {
                     Text("知道了")
                 }
+            }
+        )
+    }
+
+    if (showMemberSelectDialog) {
+        SelectMemberDialog(
+            members = uiState.availableMembers,
+            currentMemberId = uiState.selectedMember?.id,
+            onDismiss = { showMemberSelectDialog = false },
+            onSelect = { member ->
+                onSelectMember(member)
+                showMemberSelectDialog = false
             }
         )
     }
@@ -164,7 +235,7 @@ fun WeightDisplay(weight: Double, isStable: Boolean) {
 
     Box(
         modifier = Modifier
-            .size(280.dp)
+            .size(260.dp)
             .background(
                 brush = Brush.radialGradient(
                     colors = listOf(
@@ -178,7 +249,7 @@ fun WeightDisplay(weight: Double, isStable: Boolean) {
         Column(horizontalAlignment = Alignment.CenterHorizontally) {
             Text(
                 text = String.format("%.2f", weight),
-                fontSize = 80.sp,
+                fontSize = 76.sp,
                 fontWeight = FontWeight.Black,
                 color = MaterialTheme.colorScheme.onBackground.copy(alpha = if (weight > 0) alpha else 0.3f)
             )
@@ -193,7 +264,13 @@ fun WeightDisplay(weight: Double, isStable: Boolean) {
 }
 
 @Composable
-fun MeasurementResultCard(it: com.example.dianzicheng.domain.BodyMeasurement) {
+fun MeasurementResultCard(
+    measurement: BodyMeasurement,
+    availableMembers: List<FamilyMember>,
+    onBindMember: (FamilyMember) -> Unit
+) {
+    var showBindDialog by remember { mutableStateOf(false) }
+
     Card(
         modifier = Modifier.fillMaxWidth(),
         shape = RoundedCornerShape(8.dp),
@@ -202,47 +279,191 @@ fun MeasurementResultCard(it: com.example.dianzicheng.domain.BodyMeasurement) {
         )
     ) {
         Column(modifier = Modifier.padding(20.dp)) {
+            // Member Binding Row
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.SpaceBetween
+            ) {
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Icon(
+                        Icons.Default.AccountCircle,
+                        contentDescription = null,
+                        modifier = Modifier.size(22.dp),
+                        tint = MaterialTheme.colorScheme.primary
+                    )
+                    Spacer(modifier = Modifier.width(6.dp))
+                    Text(
+                        text = "数据所属: ${measurement.memberNameSnapshot ?: "智能匹配中"}",
+                        style = MaterialTheme.typography.bodyMedium,
+                        fontWeight = FontWeight.Bold,
+                        color = MaterialTheme.colorScheme.onSurface
+                    )
+                }
+                if (availableMembers.isNotEmpty()) {
+                    OutlinedButton(
+                        onClick = { showBindDialog = true },
+                        contentPadding = PaddingValues(horizontal = 10.dp, vertical = 2.dp),
+                        modifier = Modifier.height(32.dp),
+                        shape = MaterialTheme.shapes.medium
+                    ) {
+                        Text("重选/绑定成员", fontSize = 12.sp)
+                    }
+                }
+            }
+
+            Spacer(modifier = Modifier.height(16.dp))
+
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.SpaceAround
             ) {
                 MetricItem(
                     label = "BMI",
-                    value = String.format("%.1f", it.bmi),
-                    status = getBmiStatus(it.bmi),
+                    value = String.format("%.1f", measurement.bmi),
+                    status = getBmiStatus(measurement.bmi),
                     modifier = Modifier.weight(1f)
                 )
                 MetricItem(
                     label = "体脂率",
-                    value = String.format("%.1f%%", it.bodyFatPct),
-                    status = getFatStatus(it.bodyFatPct),
+                    value = String.format("%.1f%%", measurement.bodyFatPct),
+                    status = getFatStatus(measurement.bodyFatPct),
                     modifier = Modifier.weight(1f)
                 )
                 MetricItem(
                     label = "水分",
-                    value = String.format("%.1f%%", it.waterPct),
-                    status = if (it.waterPct in 50.0..65.0) "标准" else "注意",
+                    value = String.format("%.1f%%", measurement.waterPct),
+                    status = if (measurement.waterPct in 50.0..65.0) "标准" else "注意",
                     modifier = Modifier.weight(1f)
                 )
             }
-            Spacer(modifier = Modifier.height(20.dp))
+            Spacer(modifier = Modifier.height(16.dp))
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.SpaceAround
             ) {
-                MetricItem("肌肉量", String.format("%.1fkg", it.muscleKg), modifier = Modifier.weight(1f))
-                MetricItem("蛋白质", String.format("%.1f%%", it.proteinPct), modifier = Modifier.weight(1f))
-                MetricItem("骨量", String.format("%.1fkg", it.boneMassKg), modifier = Modifier.weight(1f))
+                MetricItem("肌肉量", String.format("%.1fkg", measurement.muscleKg), modifier = Modifier.weight(1f))
+                MetricItem("蛋白质", String.format("%.1f%%", measurement.proteinPct), modifier = Modifier.weight(1f))
+                MetricItem("骨量", String.format("%.1fkg", measurement.boneMassKg), modifier = Modifier.weight(1f))
             }
-            Spacer(modifier = Modifier.height(20.dp))
+            Spacer(modifier = Modifier.height(16.dp))
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.SpaceAround
             ) {
-                MetricItem("阻抗", "${it.impedanceOhm.toInt()}Ω", modifier = Modifier.weight(1f))
+                MetricItem("阻抗", "${measurement.impedanceOhm.toInt()}Ω", modifier = Modifier.weight(1f))
             }
         }
     }
+
+    if (showBindDialog) {
+        SelectMemberDialog(
+            members = availableMembers,
+            currentMemberId = measurement.memberId,
+            onDismiss = { showBindDialog = false },
+            onSelect = { member ->
+                if (member != null) {
+                    onBindMember(member)
+                }
+                showBindDialog = false
+            }
+        )
+    }
+}
+
+@Composable
+fun SelectMemberDialog(
+    members: List<FamilyMember>,
+    currentMemberId: String?,
+    onDismiss: () -> Unit,
+    onSelect: (FamilyMember?) -> Unit
+) {
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text("选择绑定成员") },
+        text = {
+            Column(modifier = Modifier.fillMaxWidth()) {
+                Text(
+                    "选择成员后，系统将使用该成员的身高、年龄与性别重新计算准确的体脂率等指标并保存绑定。",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    modifier = Modifier.padding(bottom = 12.dp)
+                )
+                
+                // Auto Match Option
+                Surface(
+                    onClick = { onSelect(null) },
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(vertical = 4.dp),
+                    shape = RoundedCornerShape(8.dp),
+                    color = if (currentMemberId == null) MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.5f) else Color.Transparent
+                ) {
+                    Row(
+                        modifier = Modifier.padding(12.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Icon(Icons.Default.AutoAwesome, contentDescription = null, tint = MaterialTheme.colorScheme.primary)
+                        Spacer(modifier = Modifier.width(12.dp))
+                        Text("全员智能自动匹配", style = MaterialTheme.typography.bodyLarge, fontWeight = FontWeight.Medium)
+                    }
+                }
+
+                HorizontalDivider(modifier = Modifier.padding(vertical = 8.dp))
+
+                if (members.isEmpty()) {
+                    Text(
+                        "暂无成员，请在“我的”页面添加家庭成员",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.error,
+                        modifier = Modifier.padding(vertical = 8.dp)
+                    )
+                } else {
+                    LazyColumn(modifier = Modifier.heightIn(max = 240.dp)) {
+                        items(members) { member ->
+                            val isSelected = member.id == currentMemberId
+                            Surface(
+                                onClick = { onSelect(member) },
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .padding(vertical = 4.dp),
+                                shape = RoundedCornerShape(8.dp),
+                                color = if (isSelected) MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.5f) else Color.Transparent
+                            ) {
+                                Row(
+                                    modifier = Modifier.padding(12.dp),
+                                    verticalAlignment = Alignment.CenterVertically
+                                ) {
+                                    Icon(
+                                        Icons.Default.Person,
+                                        contentDescription = null,
+                                        tint = if (isSelected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.outline
+                                    )
+                                    Spacer(modifier = Modifier.width(12.dp))
+                                    Column(modifier = Modifier.weight(1f)) {
+                                        Text(text = member.name, style = MaterialTheme.typography.bodyLarge, fontWeight = FontWeight.Bold)
+                                        Text(
+                                            text = "${if (member.sex == Sex.MALE) "男" else "女"} · ${member.heightCm.toInt()}cm",
+                                            style = MaterialTheme.typography.bodySmall,
+                                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                                        )
+                                    }
+                                    if (isSelected) {
+                                        Icon(Icons.Default.Check, contentDescription = null, tint = MaterialTheme.colorScheme.primary)
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        },
+        confirmButton = {
+            TextButton(onClick = onDismiss) {
+                Text("关闭")
+            }
+        }
+    )
 }
 
 private fun getBmiStatus(bmi: Double): String = when {
@@ -303,25 +524,8 @@ fun DashboardScreen(
         uiState = uiState,
         onStartScan = { viewModel.startScanning() },
         onDismissAlert = { viewModel.dismissAlert() },
+        onSelectMember = { viewModel.selectMember(it) },
+        onBindMember = { viewModel.bindCurrentMeasurementToMember(it) },
         modifier = modifier
     )
-}
-
-@Preview(showBackground = true)
-@Composable
-fun DashboardPreview() {
-    电子秤Theme(dynamicColor = true) {
-        DashboardContent(
-            uiState = ScaleUiState(
-                connection = BleScaleClient.ConnectionState.CONNECTED,
-                liveWeightKg = 70.5,
-                isStable = true,
-                currentMeasurement = com.example.dianzicheng.domain.BodyMeasurement(
-                    "1", 0, 70.5, 500.0, 22.5, 18.2, 56.5, 58.2, 16.8, 3.2, null, null
-                )
-            ),
-            onStartScan = {},
-            onDismissAlert = {}
-        )
-    }
 }
