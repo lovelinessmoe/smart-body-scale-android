@@ -13,9 +13,15 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 
+import com.example.dianzicheng.data.health.HealthConnectManager
+import com.example.dianzicheng.data.local.PreferenceManager
+import kotlinx.coroutines.flow.first
+
 class ScaleViewModel(
     private val bleClient: BleScaleClient,
-    private val repository: ScaleRepository
+    private val repository: ScaleRepository,
+    private val preferenceManager: PreferenceManager? = null,
+    private val healthConnectManager: HealthConnectManager? = null
 ) : ViewModel() {
 
     private val _uiState = MutableStateFlow(ScaleUiState())
@@ -177,6 +183,17 @@ class ScaleViewModel(
                 val shouldShowAlert = isFinalLocked && !hasAlertedForCurrentSession && (diff > 7.0)
                 if (shouldShowAlert) {
                     hasAlertedForCurrentSession = true
+                }
+
+                if (isFinalLocked && preferenceManager != null && healthConnectManager != null) {
+                    try {
+                        val enabled = preferenceManager.healthConnectEnabled.first()
+                        if (enabled && healthConnectManager.hasAllPermissions()) {
+                            healthConnectManager.writeMeasurement(finalMeasurementWithId)
+                        }
+                    } catch (e: Exception) {
+                        android.util.Log.e("ScaleViewModel", "Health Connect auto sync failed", e)
+                    }
                 }
 
                 _uiState.update {
