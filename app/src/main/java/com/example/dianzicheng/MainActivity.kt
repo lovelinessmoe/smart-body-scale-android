@@ -32,17 +32,12 @@ import com.example.dianzicheng.ui.ProfileViewModel
 import com.example.dianzicheng.ui.ScaleViewModel
 import com.example.dianzicheng.ui.theme.电子秤Theme
 
-import com.example.dianzicheng.data.backup.WebDavManager
-import com.example.dianzicheng.data.health.HealthConnectManager
-
 class MainActivity : ComponentActivity() {
     private lateinit var database: AppDatabase
     private lateinit var bleClient: BleScaleClient
     private lateinit var scaleRepository: ScaleRepository
     private lateinit var profileRepository: ProfileRepository
     private lateinit var preferenceManager: PreferenceManager
-    private lateinit var healthConnectManager: HealthConnectManager
-    private lateinit var webDavManager: WebDavManager
 
     private val requestPermissionLauncher = registerForActivityResult(
         ActivityResultContracts.RequestMultiplePermissions()
@@ -64,8 +59,6 @@ class MainActivity : ComponentActivity() {
         scaleRepository = ScaleRepository(database.scaleDao())
         profileRepository = ProfileRepository(database.scaleDao())
         preferenceManager = PreferenceManager(applicationContext)
-        healthConnectManager = HealthConnectManager(applicationContext)
-        webDavManager = WebDavManager(database.scaleDao())
 
         bleClient.onMacDiscovered = { mac ->
             lifecycleScope.launch {
@@ -87,7 +80,7 @@ class MainActivity : ComponentActivity() {
                 val scaleViewModel: ScaleViewModel = viewModel(
                     factory = object : ViewModelProvider.Factory {
                         override fun <T : ViewModel> create(modelClass: Class<T>): T {
-                            return ScaleViewModel(bleClient, scaleRepository, preferenceManager, healthConnectManager) as T
+                            return ScaleViewModel(bleClient, scaleRepository) as T
                         }
                     }
                 )
@@ -101,7 +94,7 @@ class MainActivity : ComponentActivity() {
                 val profileViewModel: ProfileViewModel = viewModel(
                     factory = object : ViewModelProvider.Factory {
                         override fun <T : ViewModel> create(modelClass: Class<T>): T {
-                            return ProfileViewModel(profileRepository, preferenceManager, webDavManager, healthConnectManager) as T
+                            return ProfileViewModel(profileRepository, preferenceManager) as T
                         }
                     }
                 )

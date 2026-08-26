@@ -24,9 +24,6 @@ interface ScaleDao {
     @Query("SELECT * FROM measurements ORDER BY measuredAtEpochMs DESC")
     fun getAllMeasurements(): Flow<List<MeasurementEntity>>
 
-    @Query("SELECT * FROM measurements ORDER BY measuredAtEpochMs DESC")
-    suspend fun getAllMeasurementsList(): List<MeasurementEntity>
-
     @Query("SELECT * FROM measurements WHERE memberId = :memberId ORDER BY measuredAtEpochMs DESC")
     fun getMeasurementsForMember(memberId: String): Flow<List<MeasurementEntity>>
 

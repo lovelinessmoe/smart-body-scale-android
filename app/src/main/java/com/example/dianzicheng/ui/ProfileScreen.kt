@@ -1,8 +1,5 @@
 package com.example.dianzicheng.ui
 
-import android.widget.Toast
-import androidx.activity.compose.rememberLauncherForActivityResult
-import androidx.health.connect.client.PermissionController
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
@@ -17,17 +14,12 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.vector.ImageVector
-import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import com.example.dianzicheng.domain.FamilyMember
 import com.example.dianzicheng.domain.Sex
 import com.example.dianzicheng.ui.theme.电子秤Theme
-import java.text.SimpleDateFormat
-import java.util.Date
-import java.util.Locale
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -36,24 +28,9 @@ fun ProfileContent(
     onAddMember: (String, Sex, Double, Long, Double) -> Unit,
     onDeleteMember: (FamilyMember) -> Unit,
     onResetPairing: () -> Unit,
-    healthConnectEnabled: Boolean,
-    onToggleHealthConnect: (Boolean) -> Unit,
-    onRequestHealthConnectPermissions: () -> Unit,
-    webdavUrl: String,
-    webdavUsername: String,
-    webdavPassword: String,
-    lastBackupTime: Long,
-    onSaveWebdavConfig: (String, String, String) -> Unit,
-    onTestWebdavConnection: (String, String, String) -> Unit,
-    onBackupData: () -> Unit,
-    onRestoreData: () -> Unit,
-    isOperating: Boolean,
     modifier: Modifier = Modifier
 ) {
     var showAddDialog by remember { mutableStateOf(false) }
-    var showWebdavDialog by remember { mutableStateOf(false) }
-
-    val dateFormat = remember { SimpleDateFormat("yyyy-MM-dd HH:mm", Locale.getDefault()) }
 
     Scaffold(
         topBar = {
@@ -111,120 +88,6 @@ fun ProfileContent(
                 }
             }
 
-            // System Health Section
-            item {
-                Spacer(modifier = Modifier.height(8.dp))
-                Text(
-                    text = "系统健康同步 (Health Connect)",
-                    style = MaterialTheme.typography.titleMedium,
-                    color = MaterialTheme.colorScheme.primary,
-                    fontWeight = FontWeight.SemiBold
-                )
-            }
-
-            item {
-                Column(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .clip(RoundedCornerShape(8.dp))
-                        .background(MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.3f))
-                ) {
-                    Row(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(horizontal = 20.dp, vertical = 16.dp),
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        Box(
-                            modifier = Modifier
-                                .size(40.dp)
-                                .clip(CircleShape)
-                                .background(MaterialTheme.colorScheme.primaryContainer),
-                            contentAlignment = Alignment.Center
-                        ) {
-                            Icon(
-                                Icons.Default.Favorite,
-                                contentDescription = null,
-                                modifier = Modifier.size(20.dp),
-                                tint = MaterialTheme.colorScheme.onPrimaryContainer
-                            )
-                        }
-                        Spacer(modifier = Modifier.width(16.dp))
-                        Column(modifier = Modifier.weight(1f)) {
-                            Text(text = "同步至系统健康", style = MaterialTheme.typography.bodyLarge, fontWeight = FontWeight.Medium)
-                            Text(
-                                text = "将体重与体脂数据同步至系统 Health Connect",
-                                style = MaterialTheme.typography.bodySmall,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant
-                            )
-                        }
-                        Switch(
-                            checked = healthConnectEnabled,
-                            onCheckedChange = onToggleHealthConnect
-                        )
-                    }
-
-                    if (healthConnectEnabled) {
-                        HorizontalDivider(
-                            modifier = Modifier.padding(horizontal = 16.dp),
-                            color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f)
-                        )
-                        SettingsItem(
-                            title = "申请健康中心读写权限",
-                            icon = Icons.Default.Security,
-                            onClick = onRequestHealthConnectPermissions
-                        )
-                    }
-                }
-            }
-
-            // WebDAV Backup Section
-            item {
-                Spacer(modifier = Modifier.height(8.dp))
-                Text(
-                    text = "WebDAV 云端备份",
-                    style = MaterialTheme.typography.titleMedium,
-                    color = MaterialTheme.colorScheme.primary,
-                    fontWeight = FontWeight.SemiBold
-                )
-            }
-
-            item {
-                Column(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .clip(RoundedCornerShape(8.dp))
-                        .background(MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.3f))
-                ) {
-                    SettingsItem(
-                        title = if (webdavUrl.isBlank()) "配置 WebDAV 服务器" else "WebDAV 已配置 (${if (webdavUrl.length > 24) webdavUrl.take(24) + "..." else webdavUrl})",
-                        icon = Icons.Default.Cloud,
-                        onClick = { showWebdavDialog = true }
-                    )
-                    HorizontalDivider(
-                        modifier = Modifier.padding(horizontal = 16.dp),
-                        color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f)
-                    )
-                    SettingsItem(
-                        title = "立即备份到 WebDAV",
-                        subtitle = if (lastBackupTime > 0) "上次备份：${dateFormat.format(Date(lastBackupTime))}" else "从未备份",
-                        icon = Icons.Default.CloudUpload,
-                        onClick = onBackupData,
-                        isLoading = isOperating
-                    )
-                    HorizontalDivider(
-                        modifier = Modifier.padding(horizontal = 16.dp),
-                        color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f)
-                    )
-                    SettingsItem(
-                        title = "从 WebDAV 恢复数据",
-                        icon = Icons.Default.CloudDownload,
-                        onClick = onRestoreData,
-                        isLoading = isOperating
-                    )
-                }
-            }
-
             // Settings Section
             item {
                 Spacer(modifier = Modifier.height(8.dp))
@@ -254,9 +117,8 @@ fun ProfileContent(
                     )
                     SettingsItem(
                         title = "关于软件",
-                        subtitle = "版本 1.2",
                         icon = Icons.Default.Info,
-                        onClick = { }
+                        onClick = { /* Show about dialog */ }
                     )
                 }
             }
@@ -276,38 +138,14 @@ fun ProfileContent(
             }
         )
     }
-
-    if (showWebdavDialog) {
-        WebDavConfigDialog(
-            initialUrl = webdavUrl,
-            initialUsername = webdavUsername,
-            initialPassword = webdavPassword,
-            onDismiss = { showWebdavDialog = false },
-            onSave = { url, user, pass ->
-                onSaveWebdavConfig(url, user, pass)
-                showWebdavDialog = false
-            },
-            onTest = { url, user, pass ->
-                onTestWebdavConnection(url, user, pass)
-            },
-            isOperating = isOperating
-        )
-    }
 }
 
 @Composable
-fun SettingsItem(
-    title: String,
-    subtitle: String? = null,
-    icon: ImageVector,
-    onClick: () -> Unit,
-    isLoading: Boolean = false
-) {
+fun SettingsItem(title: String, icon: ImageVector, onClick: () -> Unit) {
     Surface(
         onClick = onClick,
         modifier = Modifier.fillMaxWidth(),
-        color = androidx.compose.ui.graphics.Color.Transparent,
-        enabled = !isLoading
+        color = androidx.compose.ui.graphics.Color.Transparent
     ) {
         Row(
             modifier = Modifier.padding(20.dp),
@@ -320,117 +158,24 @@ fun SettingsItem(
                     .background(MaterialTheme.colorScheme.primaryContainer),
                 contentAlignment = Alignment.Center
             ) {
-                if (isLoading) {
-                    CircularProgressIndicator(
-                        modifier = Modifier.size(20.dp),
-                        color = MaterialTheme.colorScheme.onPrimaryContainer,
-                        strokeWidth = 2.dp
-                    )
-                } else {
-                    Icon(
-                        icon,
-                        contentDescription = null,
-                        modifier = Modifier.size(20.dp),
-                        tint = MaterialTheme.colorScheme.onPrimaryContainer
-                    )
-                }
+                Icon(
+                    icon, 
+                    contentDescription = null, 
+                    modifier = Modifier.size(20.dp),
+                    tint = MaterialTheme.colorScheme.onPrimaryContainer
+                )
             }
             Spacer(modifier = Modifier.width(16.dp))
-            Column(modifier = Modifier.weight(1f)) {
-                Text(text = title, style = MaterialTheme.typography.bodyLarge, fontWeight = FontWeight.Medium)
-                if (subtitle != null) {
-                    Text(
-                        text = subtitle,
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
-                    )
-                }
-            }
+            Text(text = title, style = MaterialTheme.typography.bodyLarge, fontWeight = FontWeight.Medium)
+            Spacer(modifier = Modifier.weight(1f))
             Icon(
-                Icons.Default.ArrowForward,
-                contentDescription = null,
+                Icons.Default.ArrowForward, 
+                contentDescription = null, 
                 modifier = Modifier.size(16.dp),
                 tint = MaterialTheme.colorScheme.outline
             )
         }
     }
-}
-
-@Composable
-fun WebDavConfigDialog(
-    initialUrl: String,
-    initialUsername: String,
-    initialPassword: String,
-    onDismiss: () -> Unit,
-    onSave: (String, String, String) -> Unit,
-    onTest: (String, String, String) -> Unit,
-    isOperating: Boolean
-) {
-    var url by remember { mutableStateOf(initialUrl) }
-    var username by remember { mutableStateOf(initialUsername) }
-    var password by remember { mutableStateOf(initialPassword) }
-
-    AlertDialog(
-        onDismissRequest = onDismiss,
-        title = { Text("配置 WebDAV 云同步") },
-        text = {
-            Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
-                Text(
-                    "支持坚果云、Nextcloud、OwnCloud、NAS 等任意标准 WebDAV 服务。",
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                )
-                OutlinedTextField(
-                    value = url,
-                    onValueChange = { url = it },
-                    label = { Text("服务器 URL (如 https://dav.jianguoyun.com/dav/)") },
-                    modifier = Modifier.fillMaxWidth(),
-                    shape = MaterialTheme.shapes.medium
-                )
-                OutlinedTextField(
-                    value = username,
-                    onValueChange = { username = it },
-                    label = { Text("账号 / 用户名") },
-                    modifier = Modifier.fillMaxWidth(),
-                    shape = MaterialTheme.shapes.medium
-                )
-                OutlinedTextField(
-                    value = password,
-                    onValueChange = { password = it },
-                    label = { Text("密码 / 应用授权码") },
-                    visualTransformation = PasswordVisualTransformation(),
-                    modifier = Modifier.fillMaxWidth(),
-                    shape = MaterialTheme.shapes.medium
-                )
-            }
-        },
-        confirmButton = {
-            Button(
-                onClick = { onSave(url, username, password) },
-                shape = MaterialTheme.shapes.medium
-            ) {
-                Text("保存")
-            }
-        },
-        dismissButton = {
-            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                OutlinedButton(
-                    onClick = { onTest(url, username, password) },
-                    enabled = !isOperating,
-                    shape = MaterialTheme.shapes.medium
-                ) {
-                    if (isOperating) {
-                        CircularProgressIndicator(modifier = Modifier.size(16.dp), strokeWidth = 2.dp)
-                    } else {
-                        Text("测试连接")
-                    }
-                }
-                TextButton(onClick = onDismiss) {
-                    Text("取消")
-                }
-            }
-        }
-    )
 }
 
 @Composable
@@ -454,8 +199,8 @@ fun MemberCard(member: FamilyMember, onDelete: () -> Unit) {
                 contentAlignment = Alignment.Center
             ) {
                 Icon(
-                    Icons.Default.Person,
-                    contentDescription = null,
+                    Icons.Default.Person, 
+                    contentDescription = null, 
                     modifier = Modifier.size(32.dp),
                     tint = MaterialTheme.colorScheme.onSecondaryContainer
                 )
@@ -497,13 +242,13 @@ fun AddMemberDialog(
         text = {
             Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
                 OutlinedTextField(
-                    value = name,
-                    onValueChange = { name = it },
+                    value = name, 
+                    onValueChange = { name = it }, 
                     label = { Text("姓名") },
                     modifier = Modifier.fillMaxWidth(),
                     shape = MaterialTheme.shapes.medium
                 )
-
+                
                 Text("性别", style = MaterialTheme.typography.labelLarge, color = MaterialTheme.colorScheme.primary)
                 Row(
                     modifier = Modifier.fillMaxWidth(),
@@ -522,10 +267,10 @@ fun AddMemberDialog(
                         leadingIcon = if (sex == Sex.FEMALE) { { Icon(Icons.Default.Check, null) } } else null
                     )
                 }
-
+                
                 OutlinedTextField(
-                    value = height,
-                    onValueChange = { height = it },
+                    value = height, 
+                    onValueChange = { height = it }, 
                     label = { Text("身高 (cm)") },
                     modifier = Modifier.fillMaxWidth(),
                     shape = MaterialTheme.shapes.medium
@@ -563,75 +308,28 @@ fun ProfileScreen(
     viewModel: ProfileViewModel,
     modifier: Modifier = Modifier
 ) {
-    val context = LocalContext.current
     val members by viewModel.members.collectAsState()
-    val healthConnectEnabled by viewModel.healthConnectEnabled.collectAsState()
-    val webdavUrl by viewModel.webdavUrl.collectAsState()
-    val webdavUsername by viewModel.webdavUsername.collectAsState()
-    val webdavPassword by viewModel.webdavPassword.collectAsState()
-    val lastBackupTime by viewModel.lastBackupTime.collectAsState()
-    val isOperating by viewModel.isOperating.collectAsState()
-    val statusMessage by viewModel.statusMessage.collectAsState()
-
-    val permissionLauncher = rememberLauncherForActivityResult(
-        contract = PermissionController.createRequestPermissionResultContract()
-    ) { granted ->
-        if (granted.isNotEmpty()) {
-            Toast.makeText(context, "已获得系统健康权限！", Toast.LENGTH_SHORT).show()
-        } else {
-            Toast.makeText(context, "未获得健康读写权限", Toast.LENGTH_SHORT).show()
-        }
-    }
-
-    LaunchedEffect(statusMessage) {
-        statusMessage?.let { msg ->
-            Toast.makeText(context, msg, Toast.LENGTH_LONG).show()
-            viewModel.clearStatusMessage()
-        }
-    }
-
     ProfileContent(
         members = members,
         onAddMember = { name, sex, height, birth, weight -> viewModel.addMember(name, sex, height, birth, weight) },
         onDeleteMember = { viewModel.deleteMember(it) },
         onResetPairing = { viewModel.resetPairing() },
-        healthConnectEnabled = healthConnectEnabled,
-        onToggleHealthConnect = { enabled ->
-            viewModel.setHealthConnectEnabled(enabled)
-            if (enabled && viewModel.isHealthConnectAvailable()) {
-                permissionLauncher.launch(
-                    setOf(
-                        androidx.health.connect.client.permission.HealthPermission.getWritePermission(androidx.health.connect.client.records.WeightRecord::class),
-                        androidx.health.connect.client.permission.HealthPermission.getWritePermission(androidx.health.connect.client.records.BodyFatRecord::class),
-                        androidx.health.connect.client.permission.HealthPermission.getReadPermission(androidx.health.connect.client.records.WeightRecord::class),
-                        androidx.health.connect.client.permission.HealthPermission.getReadPermission(androidx.health.connect.client.records.BodyFatRecord::class)
-                    )
-                )
-            }
-        },
-        onRequestHealthConnectPermissions = {
-            if (viewModel.isHealthConnectAvailable()) {
-                permissionLauncher.launch(
-                    setOf(
-                        androidx.health.connect.client.permission.HealthPermission.getWritePermission(androidx.health.connect.client.records.WeightRecord::class),
-                        androidx.health.connect.client.permission.HealthPermission.getWritePermission(androidx.health.connect.client.records.BodyFatRecord::class),
-                        androidx.health.connect.client.permission.HealthPermission.getReadPermission(androidx.health.connect.client.records.WeightRecord::class),
-                        androidx.health.connect.client.permission.HealthPermission.getReadPermission(androidx.health.connect.client.records.BodyFatRecord::class)
-                    )
-                )
-            } else {
-                Toast.makeText(context, "当前设备不支持或未安装 Health Connect", Toast.LENGTH_SHORT).show()
-            }
-        },
-        webdavUrl = webdavUrl,
-        webdavUsername = webdavUsername,
-        webdavPassword = webdavPassword,
-        lastBackupTime = lastBackupTime,
-        onSaveWebdavConfig = { url, user, pass -> viewModel.saveWebdavConfig(url, user, pass) },
-        onTestWebdavConnection = { url, user, pass -> viewModel.testWebdavConnection(url, user, pass) },
-        onBackupData = { viewModel.backupData() },
-        onRestoreData = { viewModel.restoreData() },
-        isOperating = isOperating,
         modifier = modifier
     )
+}
+
+@Preview(showBackground = true)
+@Composable
+fun ProfilePreview() {
+    电子秤Theme(dynamicColor = true) {
+        ProfileContent(
+            members = listOf(
+                FamilyMember("1", "我的名字", Sex.MALE, 175.0, 0, 70.0),
+                FamilyMember("2", "家庭成员", Sex.FEMALE, 165.0, 0, 50.0)
+            ),
+            onAddMember = { _, _, _, _, _ -> },
+            onDeleteMember = {},
+            onResetPairing = {}
+        )
+    }
 }
